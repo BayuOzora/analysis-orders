@@ -66,6 +66,67 @@ def money(value: float) -> str:
     return f"Rp {value:,.0f}".replace(",", ".")
 
 
+def apply_theme(dark_mode: bool) -> None:
+    if dark_mode:
+        app_gradient = "radial-gradient(circle at top left, #111827 0%, #0b1220 55%, #020617 100%)"
+        text_color = "#e5e7eb"
+        muted_text = "#9ca3af"
+        card_bg = "rgba(15, 23, 42, 0.72)"
+        border_color = "rgba(148, 163, 184, 0.28)"
+    else:
+        app_gradient = "radial-gradient(circle at top left, #f4fbf8 0%, #eef6ff 55%, #ffffff 100%)"
+        text_color = "#0f172a"
+        muted_text = "#475569"
+        card_bg = "rgba(255, 255, 255, 0.72)"
+        border_color = "rgba(100, 116, 139, 0.22)"
+
+    st.markdown(
+        f"""
+        <style>
+            .stApp {{
+                background: {app_gradient};
+                color: {text_color};
+            }}
+
+            [data-testid="stSidebar"] {{
+                border-right: 1px solid {border_color};
+            }}
+
+            [data-testid="stMetric"] {{
+                background: {card_bg};
+                border: 1px solid {border_color};
+                border-radius: 12px;
+                padding: 8px 10px;
+                backdrop-filter: blur(4px);
+            }}
+
+            [data-testid="stMetricLabel"],
+            [data-testid="stMetricValue"],
+            [data-testid="stMarkdownContainer"],
+            .stSubheader,
+            .stCaption {{
+                color: {text_color};
+            }}
+
+            .stCaption {{
+                color: {muted_text};
+            }}
+
+            [data-testid="stDataFrame"] {{
+                border: 1px solid {border_color};
+                border-radius: 10px;
+                overflow: hidden;
+            }}
+
+            [data-testid="stMetricValue"] {{
+                font-size: 1.5rem;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def apply_filters(orders: pd.DataFrame) -> pd.DataFrame:
     st.sidebar.header("Filters")
 
@@ -142,7 +203,10 @@ def compute_peak_hours(filtered_orders: pd.DataFrame) -> pd.DataFrame:
     return peak
 
 
-def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame) -> None:
+def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame, dark_mode: bool) -> None:
+    chart_template = "plotly_dark" if dark_mode else "plotly_white"
+    chart_text_color = "#e5e7eb" if dark_mode else "#0f172a"
+
     total_revenue = float(filtered_orders["total"].sum())
     total_orders = int(filtered_orders["id"].count())
     total_items = float(filtered_items["quantity"].sum())
@@ -192,8 +256,15 @@ def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame
         y="revenue",
         markers=True,
         title="Daily Revenue",
+        template=chart_template,
     )
-    trend_fig.update_layout(yaxis_title="Revenue", xaxis_title="Date")
+    trend_fig.update_layout(
+        yaxis_title="Revenue",
+        xaxis_title="Date",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color=chart_text_color,
+    )
     st.plotly_chart(trend_fig, use_container_width=True)
 
     left, right = st.columns(2)
@@ -207,8 +278,15 @@ def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame
             color="revenue",
             color_continuous_scale="Tealgrn",
             title="Hourly Transactions and Revenue Intensity",
+            template=chart_template,
         )
-        peak_fig.update_layout(xaxis_title="Hour", yaxis_title="Transactions")
+        peak_fig.update_layout(
+            xaxis_title="Hour",
+            yaxis_title="Transactions",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color=chart_text_color,
+        )
         st.plotly_chart(peak_fig, use_container_width=True)
 
     with right:
@@ -219,6 +297,12 @@ def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame
             values="revenue",
             hole=0.45,
             title="Revenue Share by Payment Method",
+            template=chart_template,
+        )
+        payment_fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color=chart_text_color,
         )
         st.plotly_chart(payment_fig, use_container_width=True)
 
@@ -232,8 +316,15 @@ def render_dashboard(filtered_orders: pd.DataFrame, filtered_items: pd.DataFrame
             histfunc="sum",
             color_continuous_scale="Sunset",
             title="Transaction Density by Weekday and Hour",
+            template=chart_template,
         )
-        heatmap_fig.update_layout(xaxis_title="Hour", yaxis_title="Weekday")
+        heatmap_fig.update_layout(
+            xaxis_title="Hour",
+            yaxis_title="Weekday",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color=chart_text_color,
+        )
         st.plotly_chart(heatmap_fig, use_container_width=True)
     else:
         st.info("No data available for weekday-hour heatmap.")
@@ -288,19 +379,9 @@ def main() -> None:
         layout="wide",
     )
 
-    st.markdown(
-        """
-        <style>
-            .stApp {
-                background: radial-gradient(circle at top left, #f4fbf8 0%, #eef6ff 55%, #ffffff 100%);
-            }
-            [data-testid="stMetricValue"] {
-                font-size: 1.5rem;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.sidebar.header("Display")
+    dark_mode = st.sidebar.toggle("Dark mode", value=False)
+    apply_theme(dark_mode)
 
     st.title("Exa Warkop Analytics Dashboard")
     st.caption("Detailed sales intelligence from backup CSV data")
@@ -322,7 +403,7 @@ def main() -> None:
         return
 
     filtered_items = build_order_items(filtered_orders, items)
-    render_dashboard(filtered_orders, filtered_items)
+    render_dashboard(filtered_orders, filtered_items, dark_mode)
 
 
 if __name__ == "__main__":
