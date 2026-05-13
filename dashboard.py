@@ -8,13 +8,25 @@ import streamlit as st
 
 DATA_DIR = Path(__file__).resolve().parent
 ORDERS_CSV = DATA_DIR / "orders_rows.csv"
+ORDERS_CSV_2 = DATA_DIR / "orders_rows_2.csv"
 ITEMS_CSV = DATA_DIR / "order_items_rows.csv"
+ITEMS_CSV_2 = DATA_DIR / "order_items_rows_2.csv"
 LOCAL_TIMEZONE = "Asia/Jakarta"
 
 
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    # Load primary data files
     orders = pd.read_csv(ORDERS_CSV)
     items = pd.read_csv(ITEMS_CSV)
+    
+    # Load and append secondary data files if they exist
+    if ORDERS_CSV_2.exists():
+        orders_2 = pd.read_csv(ORDERS_CSV_2)
+        orders = pd.concat([orders, orders_2], ignore_index=True)
+    
+    if ITEMS_CSV_2.exists():
+        items_2 = pd.read_csv(ITEMS_CSV_2)
+        items = pd.concat([items, items_2], ignore_index=True)
 
     # Parse timestamps and convert to local operational timezone.
     datetime_columns = ["created_at", "updated_at", "started_at", "completed_at", "paid_at"]
@@ -133,12 +145,18 @@ def apply_filters(orders: pd.DataFrame) -> pd.DataFrame:
     min_date = orders["date"].min()
     max_date = orders["date"].max()
 
-    start_date, end_date = st.sidebar.date_input(
-        "Date range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
-    )
+    use_date_range = st.sidebar.toggle("Filter by date range", value=True)
+
+    if use_date_range:
+        start_date, end_date = st.sidebar.date_input(
+            "Date range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+        )
+    else:
+        start_date = min_date
+        end_date = max_date
 
     payment_options = sorted(orders["payment_method"].dropna().unique().tolist())
     selected_payment = st.sidebar.multiselect(
